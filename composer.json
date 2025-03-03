@@ -1,0 +1,60 @@
+{
+    "name": "ringle/db-archive",
+    "description": "A Laravel package for archiving old database entries",
+    "type": "laravel-package",
+    "homepage": "https://ringlesoft.com/packages/db-archive",
+    "license": "MIT",
+    "keywords": [
+        "ringlesoft",
+        "backup",
+        "archive",
+        "laravel",
+        "database",
+        "old"
+    ],
+    "autoload": {
+        "psr-4": {
+            "RingleSoft\\DbArchive\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "David Ringle",
+            "email": "ringunger@gmail.com",
+            "homepage": "https://ringlesoft.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": ">=8.1",
+        "illuminate/support": "^10.0|^11.23|^12.0",
+        "illuminate/collections": "^10.0|^11.23|^12.0",
+        "illuminate/validation": "^10.0|^11.|^12.0",
+        "illuminate/broadcasting": "^10.7|^11.0|^12.0",
+        "illuminate/database": "^10.0|^11.0|^12.0"
+    },
+    "require-dev": {
+        "roave/security-advisories": "dev-latest",
+        "phpunit/phpunit": "^11.3"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "RingleSoft\\DbArchive\\DbArchiveServiceProvider"
+            ],
+            "aliases": {
+                "DbArchive": "RingleSoft\\DbArchive\\Facades\\DbArchive"
+            },
+            "dont-discover": [
+            ]
+        }
+    },
+    "branches": {
+        "stable": {
+            "name": "master"
+        }
+    },
+    "version": "0.0.1",
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
