@@ -11,14 +11,16 @@ class ArchiveSettings
     public ?int $archiveOlderThanDays;
     public String $dateColumn = 'created_at';
     public bool $softDelete = false;
+    public array $conditions = [];
 
-    public function __construct(int $archiveOlderThanDays, ?int $batchSize, ?String $dateColumn, ?bool $softDelete, ?String $tablePrefix)
+    public function __construct(?int $archiveOlderThanDays, ?int $batchSize, ?String $dateColumn, ?bool $softDelete, ?String $tablePrefix, ?array $conditions)
     {
-        $this->tablePrefix = $tablePrefix;
-        $this->archiveOlderThanDays = $archiveOlderThanDays;
+        $this->tablePrefix = $tablePrefix ?? null;
+        $this->archiveOlderThanDays = $archiveOlderThanDays ?? 365;
         $this->batchSize = $batchSize ?? $this->batchSize;
         $this->dateColumn = $dateColumn ?? $this->dateColumn;
         $this->softDelete = $softDelete ?? $this->softDelete;
+        $this->conditions = $conditions ?? $this->conditions;
     }
 
     public static function fromArray(array $settings): self
@@ -33,10 +35,11 @@ class ArchiveSettings
         $settings = array_merge($defaultSettings, $settings);
         return new self(
             archiveOlderThanDays: $settings['archive_older_than_days'] ?? null,
-            batchSize: $settings['batch_size'],
-            dateColumn: $settings['date_column'],
-            softDelete: $settings['soft_delete'],
-            tablePrefix: $settings['table_prefix']
+            batchSize: $settings['batch_size'] ?? null,
+            dateColumn: $settings['date_column'] ?? null,
+            softDelete: $settings['soft_delete'] ?? null,
+            tablePrefix: $settings['table_prefix'] ?? null,
+            conditions: $settings['conditions'] ?? null
         );
     }
 

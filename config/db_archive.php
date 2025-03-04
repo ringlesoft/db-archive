@@ -3,14 +3,7 @@ return [
     /**
      * Database configuration for the backups.
      */
-    'connection' => [
-        'connection' => env('ARCHIVE_DB_CONNECTION', 'mysql'),
-        'host' => env('ARCHIVE_DB_HOST', '127.0.0.1'),
-        'port' => env('ARCHIVE_DB_PORT', '3306'),
-        'database' => env('ARCHIVE_DB_DATABASE', 'laravel_backup'),
-        'username' => env('ARCHIVE_DB_USERNAME', 'root'),
-        'password' => env('ARCHIVE_DB_PASSWORD', ''),
-    ],
+    'connection' => env('ARCHIVE_DB_CONNECTION', 'mysql'),
 
     'backup' => [
         'table_prefix' => null,
