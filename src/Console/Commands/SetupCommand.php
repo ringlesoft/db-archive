@@ -5,6 +5,11 @@ namespace RingleSoft\DbArchive\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Config;
 use RingleSoft\DbArchive\Services\SetupService;
+use function Laravel\Prompts\alert;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\select;
+use function Laravel\Prompts\table;
+use function Laravel\Prompts\text;
 
 class SetupCommand extends Command
 {
@@ -13,7 +18,7 @@ class SetupCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'db-archive:setup {flag}';
+    protected $signature = 'db-archive:setup {flag? : Options}';
 
     /**
      * The console command description.
@@ -43,8 +48,8 @@ class SetupCommand extends Command
         $setupService = new SetupService();
         $archiveDatabaseName = Config::get("database.connections.$archiveConnection.database");
         if (!$setupService->archiveDatabaseExists()) {
-            $this->error("Archive database '$archiveDatabaseName' does not exist.");
-            if ($this->option('Do you want to create it?')) {
+            $this->info("Archive database '$archiveDatabaseName' does not exist.");
+            if (select('Do you want to create it?', ['Yes', 'No'], 'No') === 'Yes') {
                 if (!$setupService->cloneDatabase()) {
                     $this->error("Could not create archive database.");
                     return;

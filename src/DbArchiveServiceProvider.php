@@ -4,6 +4,7 @@ namespace RingleSoft\DbArchive;
 use Illuminate\Support\ServiceProvider;
 use RingleSoft\DbArchive\Console\Commands\ArchiveDataCommand;
 use RingleSoft\DbArchive\Console\Commands\BatchStatusCommand;
+use RingleSoft\DbArchive\Console\Commands\SetupCommand;
 
 class DbArchiveServiceProvider extends ServiceProvider
 {
@@ -26,6 +27,7 @@ class DbArchiveServiceProvider extends ServiceProvider
             $this->commands([
                 ArchiveDataCommand::class,
                 BatchStatusCommand::class,
+                SetupCommand::class,
             ]);
         }
     }

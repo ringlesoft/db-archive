@@ -2,25 +2,26 @@
 
 namespace RingleSoft\DbArchive\Services;
 
-use Doctrine\DBAL\Schema\Table;
+use Doctrine\DBAL\Configuration;
+use Doctrine\DBAL\DriverManager;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Doctrine\DBAL\Types;
 use InvalidArgumentException;
-use PDOException;
 use RuntimeException;
+
 
 class SetupService
 {
-    public string $tablePrefix;
+    public ?string $tablePrefix;
     public string $archiveConnection;
     public string $activeConnection;
+
     public function __construct()
     {
         $this->archiveConnection = Config::get('db_archive.connection');
         $this->tablePrefix = Config::get('db_archive.backup.table_prefix');
-        $this->activeConnection = Config::get('database.connections')[Config::get('database.default')];
+        $this->activeConnection = Config::get("database.default");
     }
 
     /**
@@ -30,7 +31,9 @@ class SetupService
     public function cloneTable($table): bool
     {
         // Get the schema manager
-        $schemaManager = DB::connection($this->activeConnection)->getDoctrineSchemaManager();
+//        $schemaManager = DB::connection($this->activeConnection)->getDoctrineSchemaManager();
+
+        $schemaManager = $this->getSchemaManager($this->activeConnection);
 
         // Get the schema of the source table
         $sourceSchema = $schemaManager->listTableDetails($table);
@@ -112,6 +115,7 @@ class SetupService
 
     function cloneDatabase(): bool
     {
+
         $activeDatabaseName = Config::get("database.connections.$this->activeConnection.database");
         $archiveDatabaseName = Config::get("database.connections.$this->archiveConnection.database");
         // Get the connection configuration
@@ -143,7 +147,7 @@ class SetupService
                     throw new RuntimeException("Unsupported database driver: {$archiveConfig['driver']}");
             }
 
-            $result = DB::connection($this->archiveConnection)->select($query, [$archiveDatabaseName]);
+            $result = DB::connection($this->activeConnection)->select($query, [$activeDatabaseName]);
 
             if (empty($result)) {
                 throw new RuntimeException("Source database '{$activeDatabaseName}' not found.");
@@ -195,29 +199,30 @@ class SetupService
 
     public function archiveTableExists(string $tableName): bool
     {
-        $archiveConfig = Config::get("database.connections.{$this->archiveConnection}");
+        $archiveConfig = Config::get("database.connections.$this->archiveConnection");
         $databaseName = $archiveConfig['database'];
         try {
             // Attempt to connect to the database server
             DB::connection($this->activeConnection)->getPdo();
 
+
             // Run a query to check if the table exists
             switch ($archiveConfig['driver']) {
                 case 'mysql':
-                    $query = "SHOW TABLES LIKE ?";
+                    $query = "SHOW TABLES LIKE '$tableName'";
                     break;
                 case 'pgsql':
-                    $query = "SELECT tablename FROM pg_tables WHERE tablename = ?";
+                    $query = "SELECT tablename FROM pg_tables WHERE tablename =  '$tableName'";
                     break;
                 case 'sqlsrv':
-                    $query = "SELECT name FROM sys.tables WHERE name = ?";
+                    $query = "SELECT name FROM sys.tables WHERE name =  '$tableName'";
                     break;
                 case 'sqlite':
                     return true;
                 default:
                     throw new RuntimeException("Unsupported database driver: {$archiveConfig['driver']}");
             }
-            $result = DB::connection($this->archiveConnection)->select($query, [$tableName]);
+            $result = DB::connection($this->archiveConnection)->select($query);
             return !empty($result);
         } catch (PDOException $e) {
             return false;
@@ -226,14 +231,11 @@ class SetupService
     }
 
 
-
-
-
     function createDatabase($connectionName, $databaseName, $charset = 'utf8mb4', $collation = 'utf8mb4_unicode_ci'): bool
     {
         $config = Config::get("database.connections.{$connectionName}");
         if (!$config) {
-            throw new \InvalidArgumentException("Connection '{$connectionName}' not found in database configuration.");
+            throw new InvalidArgumentException("Connection '{$connectionName}' not found in database configuration.");
         }
         $originalDatabase = $config['database'];
         Config::set("database.connections.{$connectionName}.database", null);
@@ -261,5 +263,31 @@ class SetupService
             Config::set("database.connections.{$connectionName}.database", $originalDatabase);
             throw new \RuntimeException("Failed to create database '{$databaseName}': " . $e->getMessage());
         }
+    }
+
+    function getSchemaManager($connectionName)
+    {
+        // Get the connection configuration
+        $config = Config::get("database.connections." . $connectionName);
+
+        if (!$config) {
+            throw new InvalidArgumentException("Connection '$connectionName' not found in database configuration. ". $connectionName);
+        }
+
+        // Create a Doctrine DBAL connection
+        $doctrineConfig = new Configuration();
+        $connectionParams = [
+            'dbname' => $config['database'],
+            'user' => $config['username'],
+            'password' => $config['password'],
+            'host' => $config['host'],
+            'driver' => $config['driver'] === 'mysql' ? 'pdo_mysql' : $config['driver'],
+            'port' => $config['port'] ?? 3306,
+        ];
+
+        $doctrineConnection = DriverManager::getConnection($connectionParams, $doctrineConfig);
+
+        // Get the schema manager
+        return $doctrineConnection->createSchemaManager();
     }
 }
