@@ -4,9 +4,10 @@ namespace RingleSoft\DbArchive\Services;
 
 use Doctrine\DBAL\Configuration;
 use Doctrine\DBAL\DriverManager;
+use Exception;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -17,6 +18,7 @@ class SetupService
     public string $archiveConnection;
     public string $activeConnection;
 
+
     public function __construct()
     {
         $this->archiveConnection = Config::get('db_archive.connection');
@@ -26,174 +28,190 @@ class SetupService
 
     /**
      * Create a new table from the given schema.
-     *
+     * @param $tableName
+     * @return bool
+     * @throws Exception
      */
-    public function cloneTable($table): bool
+    public function cloneTable($tableName): bool
     {
-        // Get the schema manager
-//        $schemaManager = DB::connection($this->activeConnection)->getDoctrineSchemaManager();
+        $targetTableName = $this->tablePrefix ? ("{$this->tablePrefix}_{$tableName}") : $tableName;
+        $sourceConnectionName = $this->activeConnection;
+        $archiveConnectionName = $this->archiveConnection;
 
-        $schemaManager = $this->getSchemaManager($this->activeConnection);
-
-        // Get the schema of the source table
-        $sourceSchema = $schemaManager->listTableDetails($table);
-
-        // Create a new table with the same schema
-
-        $archiveTableName = $this->tablePrefix ? $this->tablePrefix . '_' . $table : $table;
-        Schema::connection($this->archiveConnection)->create($archiveTableName, function ($table) use ($sourceSchema) {
-            foreach ($sourceSchema->getColumns() as $column) {
-                $type = $column->getType()->getName();
-                $columnName = $column->getName();
-                $length = $column->getLength();
-                $precision = $column->getPrecision();
-                $scale = $column->getScale();
-                $unsigned = $column->getUnsigned();
-                $notNull = $column->getNotnull();
-                $default = $column->getDefault();
-                $autoIncrement = $column->getAutoincrement();
-
-                // Add the column to the new table
-                $columnDefinition = $table->{$type}($columnName);
-                if ($length) {
-                    $columnDefinition->length($length);
-                }
-                if ($precision) {
-                    $columnDefinition->precision($precision);
-                }
-                if ($scale) {
-                    $columnDefinition->scale($scale);
-                }
-                if ($unsigned) {
-                    $columnDefinition->unsigned();
-                }
-                if (!$notNull) {
-                    $columnDefinition->nullable();
-                }
-                if ($default !== null) {
-                    $columnDefinition->default($default);
-                }
-
-                if ($autoIncrement) {
-                    $columnDefinition->autoIncrement();
-                }
+        $sourceConnection = DB::connection($sourceConnectionName);
+        $archiveConnection = DB::connection($archiveConnectionName);
+        $driverName = $sourceConnection->getDriverName();
+        $createTableStatement = '';
+        try {
+            switch ($driverName) {
+                case 'mysql':
+                    $createTableSql = $sourceConnection
+                        ->select("SHOW CREATE TABLE `{$tableName}`");
+                    if (empty($createTableSql)) {
+                        throw new RuntimeException("Source table '$tableName' does not exist on connection '$sourceConnectionName'.");
+                    }
+                    $createTableStatement = $createTableSql[0]->{'Create Table'};
+                    break;
+                case 'pgsql':
+                    $createTableSql = $sourceConnection
+                        ->select("SELECT pg_get_ddl('table', '$tableName') AS create_statement");
+                    if (empty($createTableSql)) {
+                        throw new RuntimeException("Source table '$tableName' does not exist on connection '$sourceConnectionName'.");
+                    }
+                    $createTableStatement = $createTableSql[0]->create_statement;
+                    break;
+                case 'sqlite':
+                    $createTableSql = $sourceConnection
+                        ->select("SELECT sql FROM sqlite_master WHERE type='table' AND name='$tableName'");
+                    if (empty($createTableSql)) {
+                        throw new RuntimeException("Source table '{$tableName}' does not exist on connection '$sourceConnectionName'.");
+                    }
+                    $createTableStatement = $createTableSql[0]->sql;
+                    break;
+                case 'sqlsrv':
+                    $createTableSql = $sourceConnection
+                        ->select("sp_helptext '{$tableName}'");
+                    if (empty($createTableSql)) {
+                        throw new RuntimeException("Source table '$tableName' does not exist on connection '$sourceConnectionName'.");
+                    }
+                    // SQL Server returns multiple rows for sp_helptext, concatenate them
+                    $createTableStatementArray = array_column($createTableSql, 'Text');
+                    $createTableStatement = implode('', $createTableStatementArray);
+                    //remove line breaks and tabs
+                    $createTableStatement = str_replace(array("\r", "\n", "\t"), '', $createTableStatement);
+                    // Extract CREATE TABLE statement - sp_helptext might return other info
+                    if (stripos($createTableStatement, 'CREATE TABLE') !== false) {
+                        $createTableStatement = substr($createTableStatement, stripos($createTableStatement, 'CREATE TABLE'));
+                    } else {
+                        throw new RuntimeException("Could not extract CREATE TABLE statement from sp_helptext output for table '$tableName' on connection '$sourceConnectionName'.");
+                    }
+                    break;
+                default:
+                    throw new RuntimeException("Database driver '{$driverName}' is not supported for table cloning.");
             }
 
-            // Copy indexes
-            foreach ($sourceSchema->getIndexes() as $index) {
-                $columns = $index->getColumns();
-                $indexName = $index->getName();
-                $isUnique = $index->isUnique();
-                $isPrimary = $index->isPrimary();
-                if ($isPrimary) {
-                    $table->primary($columns);
-                } elseif ($isUnique) {
-                    $table->unique($columns, $indexName);
-                } else {
-                    $table->index($columns, $indexName);
-                }
+            // Modify the CREATE TABLE statement to use the target table name
+            $createTableStatement = str_replace("`$tableName`", "`$targetTableName`", $createTableStatement);
+            if ($driverName === 'pgsql') {
+                $createTableStatement = str_replace((string)$tableName, (string)$targetTableName, $createTableStatement); //For postgresql, table name might not be quoted in CREATE TABLE statement
+            } else if ($driverName === 'sqlsrv') {
+                // For SQL Server, table names might be quoted with brackets
+                $createTableStatement = str_replace(array("[$tableName]", (string)$tableName), array("[$targetTableName]", (string)$targetTableName), $createTableStatement); // For SQL Server, table names might not be quoted in CREATE TABLE statement
             }
-
-            // Copy foreign keys
-            foreach ($sourceSchema->getForeignKeys() as $foreignKey) {
-                $columns = $foreignKey->getLocalColumns();
-                $foreignTable = $foreignKey->getForeignTableName();
-                $foreignColumns = $foreignKey->getForeignColumns();
-                $onDelete = $foreignKey->getOption('onDelete');
-                $onUpdate = $foreignKey->getOption('onUpdate');
-                $table->foreign($columns)
-                    ->references($foreignColumns)
-                    ->on($foreignTable)
-                    ->onDelete($onDelete)
-                    ->onUpdate($onUpdate);
+            // Execute the modified create table statement on the target connection
+            $archiveConnection->statement($createTableStatement);
+            return true;
+        } catch (Exception $e) {
+            if ($e instanceof QueryException && stripos($e->getMessage(), 'already exists')) {
+                // Table already exists in the archive connection, consider it a success.
+                return true;
             }
-        });
-
-        return true;
+            throw $e;
+        }
     }
 
 
-    function cloneDatabase(): bool
+    /**
+     * Clone the database structure from the active connection to the archive connection.
+     * @return bool
+     * @throws Exception
+     */
+    public function cloneDatabase(): bool
     {
+        $sourceConnection = DB::connection($this->activeConnection);
+        $targetConnection = DB::connection($this->archiveConnection);
+        $sourceDatabaseName = $sourceConnection->getDatabaseName() ?? '';
+        $targetDatabaseName = $targetConnection->getDatabaseName() ?? '';
+        $sourceDriverName = $sourceConnection->getDriverName();
+        $targetDriverName = $targetConnection->getDriverName();
+        $sourceConnectionName = $this->activeConnection;
+        $targetConnectionName = $this->archiveConnection;
 
-        $activeDatabaseName = Config::get("database.connections.$this->activeConnection.database");
-        $archiveDatabaseName = Config::get("database.connections.$this->archiveConnection.database");
-        // Get the connection configuration
-        $archiveConfig = Config::get("database.connections.{$this->archiveConnection}");
+        // Check if source and target drivers are the same for simplicity.
+        // For cross-database cloning, more complex logic would be needed to handle schema differences.
+        if ($sourceDriverName !== $targetDriverName) {
+            throw new RuntimeException("Source and target database drivers must be the the same for simple database cloning. Source: '$sourceDriverName', Target: '$targetDriverName'.");
+        }
 
-        if (!$archiveConfig) {
-            throw new InvalidArgumentException("Connection '$this->archiveConnection' not found in database configuration.");
+        if (empty($sourceDatabaseName)) {
+            throw new RuntimeException("Source database name is not set for connection '$sourceConnectionName'.");
+        }
+        if (empty($targetDatabaseName)) {
+            throw new RuntimeException("Target database name must be specified.");
         }
 
         try {
-            // Connect to the source database
-            $pdo = DB::connection($this->activeConnection)->getPdo();
-
-            // Fetch the character set and collation of the source database
-            switch ($archiveConfig['driver']) {
+            switch ($sourceDriverName) {
                 case 'mysql':
-                    $query = "SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME
-                          FROM INFORMATION_SCHEMA.SCHEMATA
-                          WHERE SCHEMA_NAME = ?";
+                    $createDatabaseStatement = "CREATE DATABASE `$targetDatabaseName`";
                     break;
                 case 'pgsql':
-                    $query = "SELECT pg_encoding_to_char(encoding) AS encoding, datcollate
-                          FROM pg_database
-                          WHERE datname = ?";
+                    $createDatabaseStatement = "CREATE DATABASE \"$targetDatabaseName\"";
                     break;
+                case 'sqlite':
+                    // SQLite databases are file-based. Creating a connection with a new name effectively creates a new empty database file if it doesn't exist.
+                    // No explicit CREATE DATABASE statement is needed. Just configuring the new connection name is sufficient.
+                    // However, for cloning structure without tables, and ensuring a truly *empty* DB, we can delete the file if it exists first.
+                    $databasePath = config("database.connections.$targetConnectionName.database");
+                    if (file_exists($databasePath)) {
+                        unlink($databasePath); // Delete existing file to ensure empty DB
+                    }
+                    // Re-establishing the connection might be needed to ensure the file is created if it didn't exist.
+                    DB::purge($targetConnectionName);
+                    DB::reconnect($targetConnectionName);
+                    return true; // SQLite creation is handled by connection itself.
                 case 'sqlsrv':
-                    throw new RuntimeException("SQL Server does not support copying database settings like MySQL or PostgreSQL.");
+                    $createDatabaseStatement = "CREATE DATABASE {$targetDatabaseName}";
+                    break;
                 default:
-                    throw new RuntimeException("Unsupported database driver: {$archiveConfig['driver']}");
+                    throw new RuntimeException("Database driver '$sourceDriverName' is not supported for database cloning.");
             }
-
-            $result = DB::connection($this->activeConnection)->select($query, [$activeDatabaseName]);
-
-            if (empty($result)) {
-                throw new RuntimeException("Source database '{$activeDatabaseName}' not found.");
+            if ($sourceDriverName !== 'sqlite') { // For SQLite, creation is handled by connection.
+                DB::statement($createDatabaseStatement);
             }
-
-            $charset = $result[0]->DEFAULT_CHARACTER_SET_NAME ?? $result[0]->encoding ?? 'utf8mb4';
-            $collation = $result[0]->DEFAULT_COLLATION_NAME ?? $result[0]->datcollate ?? 'utf8mb4_unicode_ci';
-
-
-            // Create the new database with the same character set and collation
-            return $this->createDatabase($this->archiveConnection, $archiveDatabaseName, $charset, $collation);
-
-        } catch (PDOException $e) {
-            throw new RuntimeException("Failed to create database '{$archiveDatabaseName}' based on '{$activeDatabaseName}': " . $e->getMessage());
+            return true;
+        } catch (Exception $e) {
+            if ($e instanceof QueryException && strpos(strtolower($e->getMessage()), 'already exists')) {
+                // Database already exists in the target connection, consider it a success.
+                return true;
+            }
+            throw $e;
         }
     }
 
 
     public function archiveDatabaseExists(): bool
     {
-        $archiveConfig = Config::get("database.connections.{$this->archiveConnection}");
-        $databaseName = $archiveConfig['database'];
+        $connection = DB::connection($this->archiveConnection);
+        $connection->reconnect();
+        $driverName = $connection->getDriverName();
+        $databaseName = $connection->getDatabaseName();
         try {
-            // Attempt to connect to the database server
-            DB::connection($this->activeConnection)->getPdo();
-
-            // Run a query to check if the database exists
-            switch ($archiveConfig['driver']) {
+            switch ($driverName) {
                 case 'mysql':
-                    $query = "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?";
-                    break;
+                    $databases = $connection->select("SHOW DATABASES LIKE '$databaseName'");
+                    return !empty($databases);
                 case 'pgsql':
-                    $query = "SELECT datname FROM pg_database WHERE datname = ?";
-                    break;
-                case 'sqlsrv':
-                    $query = "SELECT name FROM sys.databases WHERE name = ?";
-                    break;
+                    $databases = $connection->select("SELECT 1 FROM pg_database WHERE datname = '$databaseName'");
+                    return !empty($databases);
                 case 'sqlite':
-                    return true;
+                    // SQLite is file-based, checking if the database file exists is sufficient.
+                    $databasePath = config("database.connections.$this->archiveConnection.database");
+                    return file_exists($databasePath);
+                case 'sqlsrv':
+                    $databases = $connection->select("SELECT database_id FROM sys.databases WHERE name = '$databaseName'");
+                    return !empty($databases);
                 default:
-                    throw new RuntimeException("Unsupported database driver: {$archiveConfig['driver']}");
+                    throw new RuntimeException("Database driver '$driverName' is not supported for checking database existence.");
             }
-            $result = DB::connection($this->activeConnection)->select($query, [$databaseName]);
-            return !empty($result);
-        } catch (PDOException $e) {
-            return false;
+        } catch (QueryException $e) {
+            // Handle potential connection errors or other database-related issues
+            // For example, if the connection itself is invalid.
+            report($e); // Optionally log the exception
+            return false; // Assume database doesn't exist if there's an error reaching the database server.
+        } catch (Exception $e) {
+            report($e); // Log unexpected exceptions
+            throw $e; // Re-throw unexpected exceptions
         }
     }
 
@@ -253,7 +271,7 @@ class SetupService
                     $query = "CREATE DATABASE [{$databaseName}]";
                     break;
                 default:
-                    throw new \RuntimeException("Unsupported database driver: {$config['driver']}");
+                    throw new RuntimeException("Unsupported database driver: {$config['driver']}");
             }
             // Execute the query
             $pdo->exec($query);
@@ -261,33 +279,8 @@ class SetupService
             return true;
         } catch (PDOException $e) {
             Config::set("database.connections.{$connectionName}.database", $originalDatabase);
-            throw new \RuntimeException("Failed to create database '{$databaseName}': " . $e->getMessage());
+            throw new RuntimeException("Failed to create database '{$databaseName}': " . $e->getMessage());
         }
     }
 
-    function getSchemaManager($connectionName)
-    {
-        // Get the connection configuration
-        $config = Config::get("database.connections." . $connectionName);
-
-        if (!$config) {
-            throw new InvalidArgumentException("Connection '$connectionName' not found in database configuration. ". $connectionName);
-        }
-
-        // Create a Doctrine DBAL connection
-        $doctrineConfig = new Configuration();
-        $connectionParams = [
-            'dbname' => $config['database'],
-            'user' => $config['username'],
-            'password' => $config['password'],
-            'host' => $config['host'],
-            'driver' => $config['driver'] === 'mysql' ? 'pdo_mysql' : $config['driver'],
-            'port' => $config['port'] ?? 3306,
-        ];
-
-        $doctrineConnection = DriverManager::getConnection($connectionParams, $doctrineConfig);
-
-        // Get the schema manager
-        return $doctrineConnection->createSchemaManager();
-    }
 }
