@@ -22,7 +22,7 @@ class SetupService
     public function __construct()
     {
         $this->archiveConnection = Config::get('db_archive.connection');
-        $this->tablePrefix = Config::get('db_archive.backup.table_prefix');
+        $this->tablePrefix = Config::get('db_archive.settings.table_prefix');
         $this->activeConnection = Config::get("database.default");
     }
 
@@ -74,12 +74,9 @@ class SetupService
                     if (empty($createTableSql)) {
                         throw new RuntimeException("Source table '$tableName' does not exist on connection '$sourceConnectionName'.");
                     }
-                    // SQL Server returns multiple rows for sp_helptext, concatenate them
                     $createTableStatementArray = array_column($createTableSql, 'Text');
                     $createTableStatement = implode('', $createTableStatementArray);
-                    //remove line breaks and tabs
                     $createTableStatement = str_replace(array("\r", "\n", "\t"), '', $createTableStatement);
-                    // Extract CREATE TABLE statement - sp_helptext might return other info
                     if (stripos($createTableStatement, 'CREATE TABLE') !== false) {
                         $createTableStatement = substr($createTableStatement, stripos($createTableStatement, 'CREATE TABLE'));
                     } else {
@@ -149,29 +146,25 @@ class SetupService
                     $createDatabaseStatement = "CREATE DATABASE \"$targetDatabaseName\"";
                     break;
                 case 'sqlite':
-                    // SQLite databases are file-based. Creating a connection with a new name effectively creates a new empty database file if it doesn't exist.
-                    // No explicit CREATE DATABASE statement is needed. Just configuring the new connection name is sufficient.
-                    // However, for cloning structure without tables, and ensuring a truly *empty* DB, we can delete the file if it exists first.
                     $databasePath = config("database.connections.$targetConnectionName.database");
                     if (file_exists($databasePath)) {
                         unlink($databasePath); // Delete existing file to ensure empty DB
                     }
-                    // Re-establishing the connection might be needed to ensure the file is created if it didn't exist.
                     DB::purge($targetConnectionName);
                     DB::reconnect($targetConnectionName);
-                    return true; // SQLite creation is handled by connection itself.
+                    return true;
                 case 'sqlsrv':
                     $createDatabaseStatement = "CREATE DATABASE {$targetDatabaseName}";
                     break;
                 default:
                     throw new RuntimeException("Database driver '$sourceDriverName' is not supported for database cloning.");
             }
-            if ($sourceDriverName !== 'sqlite') { // For SQLite, creation is handled by connection.
+            if ($sourceDriverName !== 'sqlite') {
                 DB::statement($createDatabaseStatement);
             }
             return true;
         } catch (Exception $e) {
-            if ($e instanceof QueryException && strpos(strtolower($e->getMessage()), 'already exists')) {
+            if ($e instanceof QueryException && stripos($e->getMessage(), 'already exists')) {
                 // Database already exists in the target connection, consider it a success.
                 return true;
             }

@@ -3,12 +3,13 @@
 namespace RingleSoft\DbArchive\Jobs;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 use RingleSoft\DbArchive\Services\TableArchiver;
 
 class ArchiveTableJob implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, Dispatchable;
 
 
     protected String $table;

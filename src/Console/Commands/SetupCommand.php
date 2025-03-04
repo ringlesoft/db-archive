@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Laravel\Prompts\Progress;
 use RingleSoft\DbArchive\Services\SetupService;
 use function Laravel\Prompts\alert;
+use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\table;
@@ -42,13 +44,16 @@ class SetupCommand extends Command
         } else {
             $force = false;
         }
+        $tablePrefix = Config::get('db_archive.prefix');
         $archiveConnectionName = Config::get('db_archive.connection');
+        $activeConnection = DB::connection();
         $archiveConnection = DB::connection($archiveConnectionName);
 
         if (!$archiveConnection) {
             $this->error("Archive database connection '$archiveConnectionName' does not exist.");
             return;
         }
+
 
         $setupService = new SetupService();
         $archiveDatabaseName = $archiveConnection->getDatabaseName();
@@ -67,6 +72,16 @@ class SetupCommand extends Command
                     return;
                 }
             } else {
+                return;
+            }
+        }
+
+        if ($activeConnection->getDatabaseName() === $archiveConnection->getDatabaseName()) {
+            if ($tablePrefix === null || $tablePrefix === "") {
+                error("Archive database connection '$archiveConnectionName' is the same as the active connection. Please set a table prefix.");
+                return;
+            }
+            if (!confirm("Archive database connection '$archiveConnectionName' is the same as the active connection. Do you want to continue?")) {
                 return;
             }
         }

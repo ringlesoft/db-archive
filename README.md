@@ -20,4 +20,11 @@ Publish the configuration file:
 php artisan vendor:publish --provider="RingleSoft\DbArchive\DbArchiveServiceProvider"
 ```
 
+This package uses job queuing and job batches. Make sure you have both jobs and batches enabled in your application.
+
+```bash
+php artisan queue:batches-table
+php artisan migrate
+```
+
 ### Configuration
