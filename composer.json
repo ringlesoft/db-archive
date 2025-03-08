@@ -1,6 +1,6 @@
 {
-    "name": "ringle/db-archive",
-    "description": "A Laravel package for archiving old database entries",
+    "name": "ringlesoft/db-archive",
+    "description": "A Laravel package for archiving old database entries automatically",
     "type": "laravel-package",
     "homepage": "https://ringlesoft.com/packages/db-archive",
     "license": "MIT",
