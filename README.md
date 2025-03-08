@@ -106,7 +106,7 @@ php artisan migrate
 ### Artisan Command
 Run the archive command to process tables defined in your configuration:
 ```bash
-php artisan db:archive
+php artisan db-archive:archive
 ```
 This command will:
 - **Check Configuration**: Load the db-archive.php configuration file.
