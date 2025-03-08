@@ -106,23 +106,23 @@ php artisan migrate
 ### Artisan Command
 Run the archive command to process tables defined in your configuration:
 ```bash
-php artisan db:archive
+php artisan db-archive:archive
 ```
 This command will:
 - **Check Configuration**: Load the db-archive.php configuration file.
 - **Process Tables**: Iterate through the tables defined in the tables array.
-- **Create Archive** Tables (if needed): For each table, it checks if an archive table (with the configured prefix, if any) exists. If not, it creates a new archive table with the same schema as the original table.
 - **Archive Records**: Move records from the original table to the archive table based on the configured settings (date column, age, conditions, etc.).
 - **Logging and Notifications**: Log the archiving process and send notifications if enabled.
 
 ### Scheduling
-To automate the archiving process, schedule the db:archive command in your Kernel.php file:
+To automate the archiving process, schedule the db-archive:archive command in your Kernel.php file:
 
-// app/Console/Kernel.php
+>// app/Console/Kernel.php
+
 ```php
 protected function schedule(Schedule $schedule)
 {
-    $schedule->command('db:archive')->dailyAt('01:00'); // Run daily at 1:00 AM
+    $schedule->command('db-archive:archive')->dailyAt('01:00'); // Run daily at 1:00 AM
 }
 
 ```
@@ -133,6 +133,7 @@ Adjust the scheduling as per your requirements (e.g., daily, weekly, monthly).
 ### Basic Usage 
 (Archive orders table with default settings)
 > // config/db-archive.php
+
 ```php
 'tables' => [
     'orders',
