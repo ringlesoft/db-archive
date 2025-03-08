@@ -42,8 +42,8 @@ class DbArchiveServiceProvider extends ServiceProvider
             __DIR__ . '/../config/db_archive.php' => config_path('db_archive.php'),
         ], 'config');
 
-        $this->publishes([
-            __DIR__ . '/../database/migrations' => database_path('migrations'),
-        ], 'migrations');
+//        $this->publishes([
+//            __DIR__ . '/../database/migrations' => database_path('migrations'),
+//        ], 'migrations');
     }
 }

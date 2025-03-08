@@ -16,6 +16,7 @@ return [
         'date_column' => 'created_at',
         'soft_delete' => false,
         'conditions' => [],
+        'primary_id' => 'id',
     ],
 
     /**
@@ -36,7 +37,6 @@ return [
      * - Use [ 'table_name' => [<settings>], ] to override the default settings
      */
     'tables' => [],
-
 
     /**
      * Enable job queuing and batching
