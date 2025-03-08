@@ -2,31 +2,47 @@
 return [
     /**
      * Database configuration for the backups.
+     *  (Make sure this connection exists in the Laravel's config/database.php file)
      */
-    'connection' => [
-        'connection' => env('ARCHIVE_DB_CONNECTION', 'mysql'),
-        'host' => env('ARCHIVE_DB_HOST', '127.0.0.1'),
-        'port' => env('ARCHIVE_DB_PORT', '3306'),
-        'database' => env('ARCHIVE_DB_DATABASE', 'laravel_backup'),
-        'username' => env('ARCHIVE_DB_USERNAME', 'root'),
-        'password' => env('ARCHIVE_DB_PASSWORD', ''),
-    ],
+    'connection' => env('ARCHIVE_DB_CONNECTION', 'mysql_archive'),
 
-    'backup' => [
+    /**
+     * Default Settings used for archiving tables
+     */
+    'settings' => [
         'table_prefix' => null,
         'batch_size' => 1000,
         'archive_older_than_days' => 30,
         'date_column' => 'created_at',
         'soft_delete' => false,
+        'conditions' => [],
+        'primary_id' => 'id',
     ],
 
+    /**
+     * Enable logging of the archiving process
+     */
     'enable_logging' => true,
 
+    /**
+     * Send notifications about archiving process
+     */
     'notifications' => [
         'email' => 'admin@example.com',
     ],
 
-    'tables' => ['users'],
+    /**
+     * The tables to be archived
+     * - Use plain table names for default settings
+     * - Use [ 'table_name' => [<settings>], ] to override the default settings
+     */
+    'tables' => [],
 
-
+    /**
+     * Enable job queuing and batching
+     */
+    "queueing" => [
+        "enable_queuing" => true,
+        "enable_batching" => false,
+    ],
 ];

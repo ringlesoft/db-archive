@@ -2,7 +2,9 @@
 namespace RingleSoft\DbArchive;
 
 use Illuminate\Support\ServiceProvider;
-use RingleSoft\DbArchive\Commands\ArchiveDataCommand;
+use RingleSoft\DbArchive\Console\Commands\ArchiveDataCommand;
+use RingleSoft\DbArchive\Console\Commands\BatchStatusCommand;
+use RingleSoft\DbArchive\Console\Commands\SetupCommand;
 
 class DbArchiveServiceProvider extends ServiceProvider
 {
@@ -24,6 +26,8 @@ class DbArchiveServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 ArchiveDataCommand::class,
+                BatchStatusCommand::class,
+                SetupCommand::class,
             ]);
         }
     }
@@ -38,8 +42,8 @@ class DbArchiveServiceProvider extends ServiceProvider
             __DIR__ . '/../config/db_archive.php' => config_path('db_archive.php'),
         ], 'config');
 
-        $this->publishes([
-            __DIR__ . '/../database/migrations' => database_path('migrations'),
-        ], 'migrations');
+//        $this->publishes([
+//            __DIR__ . '/../database/migrations' => database_path('migrations'),
+//        ], 'migrations');
     }
 }
