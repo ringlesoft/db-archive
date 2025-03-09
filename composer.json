@@ -31,7 +31,8 @@
         "illuminate/collections": "^9|^10|^11|^12",
         "illuminate/database": "^9|^10|^11|^12",
         "illuminate/bus": "^9|^10|^11|^12",
-        "illuminate/queue": "^9|^10|^11|^12"
+        "illuminate/queue": "^9|^10|^11|^12",
+        "illuminate/notifications": "^9|^10|^11|^12"
     },
     "require-dev": {
         "roave/security-advisories": "dev-latest",
