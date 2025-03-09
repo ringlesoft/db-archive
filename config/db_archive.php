@@ -12,9 +12,8 @@ return [
     'settings' => [
         'table_prefix' => null,
         'batch_size' => 1000,
-        'archive_older_than_days' => 30,
+        'archive_older_than_days' => 365,
         'date_column' => 'created_at',
-        'soft_delete' => false,
         'conditions' => [],
         'primary_id' => 'id',
     ],

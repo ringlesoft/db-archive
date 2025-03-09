@@ -5,9 +5,8 @@ namespace RingleSoft\DbArchive;
 use Illuminate\Bus\Batch;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Log;
 use RingleSoft\DbArchive\Jobs\ArchiveTableJob;
-use RingleSoft\DbArchive\Services\TableArchiver;
+use RingleSoft\DbArchive\Utility\Logger;
 use Throwable;
 
 class DbArchive
@@ -17,7 +16,11 @@ class DbArchive
     {
     }
 
-    public function archive(): ?int
+    /**
+     * @return bool|Batch
+     * @throws Throwable
+     */
+    public function archive(): bool|Batch
     {
         $availableTables = Config::get('db_archive.tables');
         $jobData = [];
@@ -43,18 +46,17 @@ class DbArchive
                         $batch->add(new ArchiveTableJob($data['table'], $data['settings']));
                     }
                     $batch->then(function (Batch $batch) {
-                        // All jobs completed successfully
-                        Log::info('All jobs in the batch completed successfully.');
+                        Logger::info('All jobs in the batch completed successfully.');
                     })->catch(function (Batch $batch, Throwable $e) {
-                        // Handle job failure
-                        Log::error('Batch failed: ' . $e->getMessage());
+                        Logger::error('Batch failed: ' . $e->getMessage());
                     })->finally(function (Batch $batch) {
-                        // Execute after the batch has finished (success or failure)
-                        Log::info('Batch processing finished.');
+                        Logger::info('Batch processing finished.');
+                    })->then(function (Batch $batch) {
+                        return $batch->id;
                     })->dispatch();
-                    return $batch->id;
                 } catch (Throwable $e) {
-                    Log::error('Batch failed: ' . $e->getMessage());
+                    Logger::error('Batch failed: ' . $e->getMessage());
+                    throw $e;
                 }
             } else {
                 foreach($jobData as $data){
@@ -63,11 +65,10 @@ class DbArchive
             }
         } else {
             foreach($jobData as $data){
-                ArchiveTableJob::dispatch($data['table'], $data['settings']);
+                ArchiveTableJob::dispatchSync($data['table'], $data['settings']);
             }
         }
-
-        return null;
+        return true;
     }
 
 }
