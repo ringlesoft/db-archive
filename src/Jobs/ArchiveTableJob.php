@@ -1,6 +1,7 @@
 <?php
 
 namespace RingleSoft\DbArchive\Jobs;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
@@ -10,7 +11,7 @@ use RingleSoft\DbArchive\Services\TableArchiver;
 
 class ArchiveTableJob implements ShouldQueue
 {
-    use Queueable, SerializesModels, InteractsWithQueue, Dispatchable;
+    use Queueable, SerializesModels, InteractsWithQueue, Dispatchable, Batchable;
 
 
     protected String $table;

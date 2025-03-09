@@ -3,11 +3,13 @@
 namespace RingleSoft\DbArchive\Services;
 
 use Exception;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use RingleSoft\DbArchive\Utility\Logger;
 use Throwable;
 
 class TableArchiver
@@ -42,7 +44,11 @@ class TableArchiver
     }
 
 
-    public function archive()
+    /**
+     * @return bool
+     * @throws Throwable
+     */
+    public function archive(): bool
     {
         $this->cutoffDate = Carbon::now()->subDays($this->settings->archiveOlderThanDays);
         $this->log("Archiving table: " . $this->table);
@@ -68,41 +74,39 @@ class TableArchiver
                         }
                     }
                 })
-                ->orderBy($dateColumn) // Assuming 'id' is your primary key and is auto-incrementing for efficient chunking
+                ->orderBy($dateColumn)
                 ->chunkById($chunkSize, function ($sourceRecords) use ($sourceTableName, $archiveTableName, $archiveConnection, $sourceConnection, $primaryId) {
                     $dataToArchive = [];
                     $idsToDelete = [];
 
                     foreach ($sourceRecords as $record) {
-                        $dataToArchive[] = (array)$record; // Exclude 'id' if you want auto-increment in archive table
+                        $dataToArchive[] = (array)$record;
                         $idsToDelete[] = $record->{$primaryId};
                     }
 
                     if (!empty($dataToArchive)) {
-                        $archiveConnection->table($archiveTableName)->insert($dataToArchive); // Efficient bulk insert
+                        $archiveConnection->table($archiveTableName)->insert($dataToArchive);
                     }
 
                     if (!empty($idsToDelete)) {
                         $sourceConnection->table($sourceTableName)
                             ->whereIn($primaryId, $idsToDelete)
-                            ->delete(); // Efficient bulk delete based on IDs
+                            ->delete();
                     }
                 });
-
-            DB::commit(); // Commit the transaction if everything was successful
+            DB::commit();
             return true;
-
         } catch (QueryException $e) {
             DB::rollBack(); // Rollback the transaction in case of any error
-            report($e); // Log the exception for debugging
+            Logger::error($e->getMessage());
             return false; // Or throw an exception if you want to handle it differently up the call stack
         } catch (Exception $e) {
             DB::rollBack(); // Rollback transaction for other exceptions as well
-            report($e);
+            Logger::error($e->getMessage());
             return false; // Or throw exception
         } catch (Throwable $e) {
             DB::rollBack(); // Rollback transaction for other exceptions as well
-            report($e);
+            Logger::error($e->getMessage());
             return false; // Or throw exception
         }
     }
