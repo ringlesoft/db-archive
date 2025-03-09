@@ -27,11 +27,11 @@
     ],
     "require": {
         "php": ">=8.1",
-        "illuminate/support": "^10.0|^11.23|^12.0",
-        "illuminate/collections": "^10.0|^11.23|^12.0",
-        "illuminate/validation": "^10.0|^11.|^12.0",
-        "illuminate/broadcasting": "^10.7|^11.0|^12.0",
-        "illuminate/database": "^10.0|^11.0|^12.0"
+        "illuminate/support": "^9|^10|^11|^12",
+        "illuminate/collections": "^9|^10|^11|^12",
+        "illuminate/database": "^9|^10|^11|^12",
+        "illuminate/bus": "^9|^10|^11|^12",
+        "illuminate/queue": "^9|^10|^11|^12"
     },
     "require-dev": {
         "roave/security-advisories": "dev-latest",
