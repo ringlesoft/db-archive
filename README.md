@@ -30,8 +30,9 @@ php artisan vendor:publish --provider="RingleSoft\DbArchive\DbArchiveServiceProv
 ### Configuration Options:
 #### `connection`:
 - The database connection name to be used for creating archive tables and moving data.
-- Ensure this connection is defined in your config/database.php file.
-- Defaults to mysql_archive and can be overridden using the ARCHIVE_DB_CONNECTION environment variable.
+- Ensure this connection is defined in your `config/database.php` file.
+- I recommend using a different connection from your application's default connection.
+- Defaults to `mysql_archive` and can be overridden using the `ARCHIVE_DB_CONNECTION` environment variable.
 
 #### `settings`:
 - `table_prefix`:
@@ -43,24 +44,20 @@ php artisan vendor:publish --provider="RingleSoft\DbArchive\DbArchiveServiceProv
   - Adjust this value based on your server resources and table size.
   - Defaults to 1000.
 
+- `date_column`:
+    - The database column used to determine the age of records for archiving (e.g., `created_at`, `updated_at`).
+    - Defaults to `created_at`.
+  
 - `archive_older_than_days`:
   - Number of days after which records are considered old enough to be archived.
-  - Records with a date in the date_column older than this value will be archived.
-  - Defaults to 30 days .
-
-- `date_column`:
-  - The database column used to determine the age of records for archiving (e.g., created_at, updated_at).
-  - Defaults to created_at.
-
-- `soft_delete`:
-  - Boolean value to indicate if soft-deleted records should be included in the archive.
-  - If set to true, records that are soft-deleted (have a deleted_at timestamp) will also be archived if they meet the age criteria.
-  - Defaults to false.
+  - Records with a date in the `date_column` older than this value will be archived.
+  - Defaults to `365` days .
 
 - `conditions`:
   - An array of additional where conditions to filter records for archiving.
   - Allows for more specific criteria for selecting records to archive.
   - Defaults to an empty array `[]`.
+  - Example: `[['status', 'active']]` or `[['id', '<= 100]]`
 
 #### `enable_logging`:
 - Boolean value to enable or disable logging of the archiving process.
@@ -68,14 +65,15 @@ php artisan vendor:publish --provider="RingleSoft\DbArchive\DbArchiveServiceProv
 - Defaults to true.
 
 #### `notifications`:
-- email:
+- `email`:
   - Email address to receive notifications about the archiving process (success or failure).
   - Set to null to disable email notifications.
-  - Defaults to admin@example.com.
+  - Defaults to `admin@example.com`.
+  - This only works if batching is enabled (for now).
   
 #### `tables`:
 - An array defining the tables to be archived.
-- Plain Table Names: Specify table names as strings to use the default settings for archiving.
+- User plain table names array for default settings or associative array for specific settings.
 
 ## Setting Up
 To setup the package, run the following command:
@@ -109,13 +107,13 @@ Run the archive command to process tables defined in your configuration:
 php artisan db-archive:archive
 ```
 This command will:
-- **Check Configuration**: Load the db-archive.php configuration file.
+- **Check Configuration**: Load the `db-archive.php` configuration file.
 - **Process Tables**: Iterate through the tables defined in the tables array.
-- **Archive Records**: Move records from the original table to the archive table based on the configured settings (date column, age, conditions, etc.).
+- **Archive Records**: Move records from the original table to the archive table based on the configured settings (age, conditions, etc.).
 - **Logging and Notifications**: Log the archiving process and send notifications if enabled.
 
 ### Scheduling
-To automate the archiving process, schedule the db-archive:archive command in your Kernel.php file:
+To automate the archiving process, schedule the `db-archive:archive` command in your `Kernel.php` file:
 
 >// app/Console/Kernel.php
 
@@ -135,18 +133,22 @@ Adjust the scheduling as per your requirements (e.g., daily, weekly, monthly).
 > // config/db-archive.php
 
 ```php
+'connection' => 'mysql_archive',
+...
 'tables' => [
     'orders',
+    'comments'
 ],
 ```
-This configuration will archive records from the users table that are older than 30 days (based on the created_at column) to a table named archive_users (if table_prefix is set to archive_).
+This configuration will archive records from the `users` table in your default connection that are older than 365 days (based on the `created_at` column) to `users` table in the `mysql_archive` connection.
 
-## Custom Settings
-
+### Custom Settings
 
 > // config/db-archive.php
 
 ```php
+'connection' => 'mysql_archive',
+...
 'tables' => [
     'orders' => [
         'archive_older_than_days' => 90, // Archive orders older than 90 days
@@ -158,8 +160,10 @@ This configuration will archive records from the users table that are older than
     ],
 ];
 ```
-This configuration will archive records from the orders table that are older than 90 days (based on the order_date column), processed in batches of 5000, and only for orders with a status of 'completed'.
+This configuration will archive records from the `orders` table that are older than `90` days (based on the `order_date` column), processed in batches of `5000`, and only for orders with a `status` of '`completed`'.
 
+Enjoy!
+ *** 
 
 ## Contributing
 Contributions are welcome! Please feel free to submit pull requests or open issues to suggest improvements or report bugs.
