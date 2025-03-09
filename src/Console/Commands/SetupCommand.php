@@ -8,13 +8,10 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Laravel\Prompts\Progress;
 use RingleSoft\DbArchive\Services\SetupService;
-use function Laravel\Prompts\alert;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\select;
-use function Laravel\Prompts\table;
-use function Laravel\Prompts\text;
 use function Laravel\Prompts\warning;
 
 class SetupCommand extends Command
@@ -24,26 +21,22 @@ class SetupCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'db-archive:setup {flag? : Options}';
+    protected $signature = 'db-archive:setup {--force : Force recreating tables when existing}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Copy the schema of an existing table to create a new table with an identical schema.';
+    protected $description = 'Initialize the package: Copy the schema of an existing table to create a new table with an identical schema.';
 
     /**
      * Execute the console command.
      */
     public function handle(): void
     {
-        $flag = $this->argument('flag');
-        if ($flag === '--force' || $flag === '-f') {
-            $force = true;
-        } else {
-            $force = false;
-        }
+        $force = (bool)$this->option('force');
+
         $tablePrefix = Config::get('db_archive.prefix');
         $archiveConnectionName = Config::get('db_archive.connection');
         $activeConnection = DB::connection();
@@ -77,6 +70,7 @@ class SetupCommand extends Command
         }
 
         if ($activeConnection->getDatabaseName() === $archiveConnection->getDatabaseName()) {
+            // If the same database is used for backup, maike sure a prefix is set
             if ($tablePrefix === null || $tablePrefix === "") {
                 error("Archive database connection '$archiveConnectionName' is the same as the active connection. Please set a table prefix.");
                 return;
@@ -94,12 +88,22 @@ class SetupCommand extends Command
 
         $progressBar = new Progress("Preparing Tables", count($availableTales));
         $progressBar->start();
-        foreach ($availableTales as $table) {
+        foreach ($availableTales as $key => $value) {
+            if (is_numeric($key)) {
+                $table = $value;
+            } else {
+                $table = $key;
+            }
             if ($setupService->archiveTableExists($table)) {
+                warning("Table already exists. Use --force to overwrite.");
                 if (!$force) {
-                    info("Table already exists. Use --force to overwrite.");
+                    $this->info("Table already exists. Use --force to overwrite.");
                     $progressBar->advance();
                     continue;
+                } else {
+                    if (!$setupService->dropArchiveTable($table)) {
+                        $this->info("Failed to drop table: " . $table);
+                    }
                 }
             }
             try {

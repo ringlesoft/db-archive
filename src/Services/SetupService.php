@@ -8,7 +8,10 @@ use Exception;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
+use PDOException;
+use RingleSoft\DbArchive\Utility\Logger;
 use RuntimeException;
 
 
@@ -211,13 +214,8 @@ class SetupService
     public function archiveTableExists(string $tableName): bool
     {
         $archiveConfig = Config::get("database.connections.$this->archiveConnection");
-        $databaseName = $archiveConfig['database'];
         try {
-            // Attempt to connect to the database server
             DB::connection($this->activeConnection)->getPdo();
-
-
-            // Run a query to check if the table exists
             switch ($archiveConfig['driver']) {
                 case 'mysql':
                     $query = "SHOW TABLES LIKE '$tableName'";
@@ -274,6 +272,17 @@ class SetupService
             Config::set("database.connections.{$connectionName}.database", $originalDatabase);
             throw new RuntimeException("Failed to create database '{$databaseName}': " . $e->getMessage());
         }
+    }
+
+    public function dropArchiveTable(mixed $table): bool
+    {
+        try {
+            Schema::connection($this->archiveConnection)->dropIfExists($table);
+        } catch (Exception $e) {
+            Logger::debug($e);
+            return false;
+        }
+        return true;
     }
 
 }
