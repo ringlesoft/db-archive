@@ -57,7 +57,7 @@ php artisan vendor:publish --provider="RingleSoft\DbArchive\DbArchiveServiceProv
   - An array of additional where conditions to filter records for archiving.
   - Allows for more specific criteria for selecting records to archive.
   - Defaults to an empty array `[]`.
-  - Example: `[['status', 'active']]` or `[['id', '<= 100]]`
+  - Example: `[['status', 'active']]` or `[['id', '<=', 100]]`
 
 #### `enable_logging`:
 - Boolean value to enable or disable logging of the archiving process.
