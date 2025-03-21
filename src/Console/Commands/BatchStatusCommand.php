@@ -13,7 +13,7 @@ class BatchStatusCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'db-archiver:batch-status {batchId}';
+    protected $signature = 'db-archive:batch-status {batchId}';
 
     /**
      * The console command description.

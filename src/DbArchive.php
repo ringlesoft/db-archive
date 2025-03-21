@@ -52,7 +52,7 @@ class DbArchive
                     })->finally(function (Batch $batch) {
                         Logger::info('Batch processing finished.');
                     })->then(function (Batch $batch) {
-                        return $batch->id;
+                        return $batch;
                     })->dispatch();
                 } catch (Throwable $e) {
                     Logger::error('Batch failed: ' . $e->getMessage());
