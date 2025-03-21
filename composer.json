@@ -36,7 +36,9 @@
     },
     "require-dev": {
         "roave/security-advisories": "dev-latest",
-        "phpunit/phpunit": "^11.3"
+        "phpunit/phpunit": "^11.3",
+        "orchestra/testbench": "^9.1",
+        "nunomaduro/collision": "^8.1"
     },
     "extra": {
         "laravel": {
@@ -55,6 +57,7 @@
             "name": "master"
         }
     },
+
     "version": "0.0.2",
     "minimum-stability": "dev",
     "prefer-stable": true
