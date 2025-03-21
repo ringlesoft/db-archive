@@ -80,15 +80,15 @@ class SetupCommand extends Command
             }
         }
 
-        $availableTales = Config::get('db_archive.tables', []);
-        if (empty($availableTales)) {
-            $this->error("No tales found in config file.");
+        $availableTables = Config::get('db_archive.tables', []);
+        if (empty($availableTables)) {
+            $this->error("No tables found in config file.");
             return;
         }
 
-        $progressBar = new Progress("Preparing Tables", count($availableTales));
+        $progressBar = new Progress("Preparing Tables", count($availableTables));
         $progressBar->start();
-        foreach ($availableTales as $key => $value) {
+        foreach ($availableTables as $key => $value) {
             if (is_numeric($key)) {
                 $table = $value;
             } else {
