@@ -36,9 +36,7 @@
     },
     "require-dev": {
         "roave/security-advisories": "dev-latest",
-        "phpunit/phpunit": "^11.3",
-        "orchestra/testbench": "^9.1",
-        "nunomaduro/collision": "^8.1"
+        "phpunit/phpunit": "^11.3"
     },
     "extra": {
         "laravel": {
