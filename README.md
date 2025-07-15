@@ -13,21 +13,76 @@ Easily archive your Laravel database tables periodically to keep your applicatio
 
 > Laravel 10.x and above
 
+## Features
+- **Automated Data Archiving**: Move old data to archive tables based on configurable age thresholds
+- **Database Connection Separation**: Keep your archive in a separate database connection
+- **Batch Processing**: Process large tables in manageable batches to prevent memory issues
+- **Flexible Configuration**: Configure different archive settings per table
+- **Laravel Queue Integration**: Use Laravel's queue system for background processing
+- **Conditional Archiving**: Archive only records that match specific conditions
+- **Model Integration**: Use the `ArchivesData` trait to easily access archived records from your models
+- **Command Line Interface**: Run archive operations and check status via Artisan commands
+- **Comprehensive Logging**: Keep track of all archive operations with detailed logs
+
 ## Installation
+### Step 1: Install The Package
 You can install the package via composer:
 
 ```bash
 composer require ringlesoft/db-archive
 ```
-
-## Configuration
+### Step 2: Publish Configuration
 Publish the configuration file with:
 
 ```bash
 php artisan vendor:publish --provider="RingleSoft\DbArchive\DbArchiveServiceProvider" --tag="config"
 ```
+### Step 3: Setup Archive Database Connection
+Define your archive database connection in your `config/database.php` file. You can easily do this by clonning your default database and changing its properties. For example:
+```php
+'databases' => [
+    ...,
+    'mysql_archive' => [
+        'driver' => 'mysql',
+        'host' => 'localhost',
+        'port' => '3306',
+        'database' => 'archive_database',
+        'username' => 'root',
+        'password' => 'password',
+        'charset' => 'utf8mb4',
+        'collation' => 'utf8mb4_unicode_ci',
+    ],
+],
+```
+After this, use the `ARCHIVE_DB_CONNECTION` environment variable to specify the connection name for archive operations.
+```editorconfig
+ARCHIVE_DB_CONNECTION=mysql_archive
+```
 
-### Configuration Options:
+### Step 4: Configure Your Tables
+In your `config/db-archive.php` file, define the tables you want to archive and their associated settings. For example:
+```php
+'tables' => [
+    'orders',
+    'activity_logs',
+    'audit_trail'
+],
+```
+
+### Step 5: Run Setup Command
+Run the `setup` [command](#setting-up) to create the archive database and tables:
+```bash
+php artisan db-archive:setup
+```
+
+### Step 6: Start Archiving
+You can now start archiving your data using the `archive` [command](#artisan-command) or by [scheduling](#scheduling) it using a cron job.
+You can also implement the `ArchivesData` trait in your models to access their archived records.
+
+***
+
+## Configuration
+### Available Configuration Options:
 #### `connection`:
 - The database connection name to be used for creating archive tables and moving data.
 - Ensure this connection is defined in your `config/database.php` file.
@@ -80,7 +135,11 @@ To setup the package, run the following command:
 ```bash
 php artisan db-archive:setup
 ```
-This will create the backup database and tables if not already present.
+This will create the backup database and tables if not already present. The command uses the schema of the original tables to create the archive tables.
+If the tables already exist, it will skip the setup process. To overwrite the existing tables, use the `--force` option:
+```bash
+php artisan db-archive:setup --force
+```
 
 
 ## Queueing and Batching

@@ -58,7 +58,7 @@ class SetupCommand extends Command
                         $this->error("Could not create archive database.");
                         return;
                     } else {
-                        info("Archive database '$archiveDatabaseName' created.");
+                        $this->info("Archive database '$archiveDatabaseName' created.");
                     }
                 } catch (Exception $e) {
                     warning("Could not create archive database due to error: " . $e->getMessage());

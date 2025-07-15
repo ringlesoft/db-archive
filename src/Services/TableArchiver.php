@@ -51,7 +51,7 @@ class TableArchiver
     public function archive(): bool
     {
         $this->cutoffDate = Carbon::now()->subDays($this->settings->archiveOlderThanDays);
-        $this->log("Archiving table: " . $this->table);
+        Logger::info("Archiving table: " . $this->table);
         $sourceConnection = DB::connection($this->activeConnection);
         $archiveConnection = DB::connection($this->archiveConnection);
         $sourceTableName = $this->table;
@@ -110,19 +110,5 @@ class TableArchiver
             return false; // Or throw exception
         }
     }
-
-    /**
-     * @param $data
-     * @param String|null $type
-     * @return void
-     */
-    private function log($data, ?string $type = "info"): void
-    {
-        if (Config::get('db_archive.enable_logging')) {
-            // TODO: modify the method
-            Log::debug($data);
-        }
-    }
-
 }
 
