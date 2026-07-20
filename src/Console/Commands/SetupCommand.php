@@ -21,7 +21,7 @@ class SetupCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'db-archive:setup {--force : Force recreating tables when existing}';
+    protected $signature = 'db-archive:setup {--force : Replace existing archive tables} {--dry-run : Preview changes without modifying the archive database}';
 
     /**
      * The console command description.
@@ -36,6 +36,7 @@ class SetupCommand extends Command
     public function handle(): void
     {
         $force = (bool)$this->option('force');
+        $dryRun = (bool)$this->option('dry-run');
 
         $tablePrefix = Config::get('db_archive.settings.table_prefix');
         $archiveConnectionName = Config::get('db_archive.connection');
@@ -47,11 +48,30 @@ class SetupCommand extends Command
             return;
         }
 
+        $availableTables = Config::get('db_archive.tables', []);
+        if (empty($availableTables)) {
+            $this->error("No tables found in config file.");
+            return;
+        }
+
 
         $setupService = new SetupService();
         $archiveDatabaseName = $archiveConnection->getDatabaseName();
         if (!$setupService->archiveDatabaseExists()) {
             $this->info("Archive database '$archiveDatabaseName' does not exist.");
+            if ($dryRun) {
+                $this->info("Dry run: would create archive database '$archiveDatabaseName'.");
+                foreach (array_keys($availableTables) as $key) {
+                    $table = is_numeric($key) ? $availableTables[$key] : $key;
+                    $archiveTable = $tablePrefix ? "{$tablePrefix}_{$table}" : $table;
+                    $this->info("Dry run: would create archive table '$archiveTable'.");
+                }
+                return;
+            }
+            if (!$this->input->isInteractive()) {
+                $this->error("Archive database '$archiveDatabaseName' does not exist. Create it manually or run this command interactively.");
+                return;
+            }
             if (select('Do you want to create it?', ['Yes', 'No'], 'No') === 'Yes') {
                 try {
                     if (!$setupService->cloneDatabase()) {
@@ -75,19 +95,18 @@ class SetupCommand extends Command
                 error("Archive database connection '$archiveConnectionName' is the same as the active connection. Please set a table prefix.");
                 return;
             }
-            if (!confirm("Archive database connection '$archiveConnectionName' is the same as the active connection. Do you want to continue?")) {
+            if (!$dryRun && !$this->input->isInteractive()) {
+                $this->error('Using the active database for archives requires interactive confirmation.');
+                return;
+            }
+            if (!$dryRun && !confirm("Archive database connection '$archiveConnectionName' is the same as the active connection. Do you want to continue?")) {
                 return;
             }
         }
 
-        $availableTables = Config::get('db_archive.tables', []);
-        if (empty($availableTables)) {
-            $this->error("No tables found in config file.");
-            return;
-        }
-
         $progressBar = new Progress("Preparing Tables", count($availableTables));
         $progressBar->start();
+        $forceConfirmed = false;
         foreach ($availableTables as $key => $value) {
             if (is_numeric($key)) {
                 $table = $value;
@@ -95,16 +114,33 @@ class SetupCommand extends Command
                 $table = $key;
             }
             if ($setupService->archiveTableExists($table)) {
+                if ($dryRun) {
+                    $action = $force ? 'replace' : 'keep';
+                    $this->info("Dry run: would $action existing archive table '$table'.");
+                    $progressBar->advance();
+                    continue;
+                }
                 warning("Table already exists. Use --force to overwrite.");
                 if (!$force) {
                     $this->info("Table already exists. Use --force to overwrite.");
                     $progressBar->advance();
                     continue;
                 } else {
+                    if (!$forceConfirmed && $this->input->isInteractive()) {
+                        if (!confirm('Replacing archive tables permanently deletes their archived data. Continue?')) {
+                            return;
+                        }
+                        $forceConfirmed = true;
+                    }
                     if (!$setupService->dropArchiveTable($table)) {
                         $this->info("Failed to drop table: " . $table);
                     }
                 }
+            }
+            if ($dryRun) {
+                $this->info("Dry run: would create archive table '$table'.");
+                $progressBar->advance();
+                continue;
             }
             try {
                 $setupService->cloneTable($table);
