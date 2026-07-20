@@ -17,6 +17,11 @@
             "RingleSoft\\DbArchive\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
     "authors": [
         {
             "name": "David Ringle",
@@ -37,7 +42,12 @@
     },
     "require-dev": {
         "roave/security-advisories": "dev-latest",
-        "phpunit/phpunit": "^11.3"
+        "phpunit/phpunit": "^11.3",
+        "orchestra/testbench": "^10.0"
+    },
+    "scripts": {
+        "test": "@php vendor/bin/phpunit",
+        "test:coverage": "@php vendor/bin/phpunit --coverage-text"
     },
     "extra": {
         "laravel": {
