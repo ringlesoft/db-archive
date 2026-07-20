@@ -17,7 +17,15 @@ Trait ArchivesData
      */
     public static function archived(): static
     {
-        return (new static())->setConnection(Config::get('db_archive.connection'));
+        $model = new static();
+        $settings = static::getArchiveSettings();
+        $prefix = $settings['table_prefix'] ?? null;
+
+        if ($prefix) {
+            $model->setTable($prefix . '_' . $model->getTable());
+        }
+
+        return $model->setConnection(Config::get('db_archive.connection'));
     }
 
 
