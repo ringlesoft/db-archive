@@ -1,1 +1,0 @@
-{"version":1,"defects":[],"times":{"Tests\\Integration\\ArchivesDataTest::test_it_uses_the_prefixed_archive_table":0.055,"Tests\\Integration\\TableArchiverTest::test_it_archives_eligible_rows_and_reports_the_outcome":0.026,"Tests\\Integration\\TableArchiverTest::test_it_soft_deletes_source_rows_when_configured":0.012}}
