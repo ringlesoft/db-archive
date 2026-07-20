@@ -118,6 +118,14 @@ You can also implement the `ArchivesData` trait in your models to access their a
   - The unique identifier used for chunking and safe archive retries.
   - Defaults to `id`; it must be unique in both source and archive tables.
 
+- `soft_delete`:
+  - Set to `true` to retain archived source rows and mark them as deleted instead of removing them. (Defies the purpose of the package though!)
+  - Defaults to `false`.
+
+- `soft_delete_column`:
+  - The timestamp column set when `soft_delete` is enabled.
+  - Defaults to `deleted_at`.
+
 #### `enable_logging`:
 - Boolean value to enable or disable logging of the archiving process.
 - Logs are stored in the default Laravel log file.
@@ -144,6 +152,10 @@ This will create the backup database and tables if not already present. The comm
 If the tables already exist, it will skip the setup process. To overwrite the existing tables, use the `--force` option:
 ```bash
 php artisan db-archive:setup --force
+```
+In interactive mode, replacing archive tables requires confirmation. Preview setup work without database changes with:
+```bash
+php artisan db-archive:setup --dry-run
 ```
 
 
@@ -175,6 +187,9 @@ This command will:
 - **Process Tables**: Iterate through the tables defined in the tables array.
 - **Archive Records**: Move records from the original table to the archive table based on the configured settings (age, conditions, etc.).
 - **Logging and Notifications**: Log the archiving process and send notifications if enabled.
+
+### Results and Events
+`TableArchiver::archiveWithResult()` returns an `ArchiveResult` containing scanned, archived, and removed row counts. The package also dispatches `TableArchived` and `TableArchivingFailed` events, each containing that result, so applications can attach metrics or audit listeners.
 
 ### Scheduling
 To automate the archiving process, schedule the `db-archive:archive` command in your `Kernel.php` file:
