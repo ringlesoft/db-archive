@@ -11,16 +11,18 @@ class ArchiveSettings
     public ?int $archiveOlderThanDays;
     public String $dateColumn = 'created_at';
     public bool $softDelete = false;
+    public string $softDeleteColumn = 'deleted_at';
     public array $conditions = [];
     public ?string $primaryId = "id";
 
-    public function __construct(?int $archiveOlderThanDays, ?int $batchSize, ?String $dateColumn, ?bool $softDelete, ?String $tablePrefix, ?array $conditions, ?string $primaryId)
+    public function __construct(?int $archiveOlderThanDays, ?int $batchSize, ?String $dateColumn, ?bool $softDelete, ?string $softDeleteColumn, ?String $tablePrefix, ?array $conditions, ?string $primaryId)
     {
         $this->tablePrefix = $tablePrefix ?? null;
         $this->archiveOlderThanDays = $archiveOlderThanDays ?? 365;
         $this->batchSize = $batchSize ?? $this->batchSize;
         $this->dateColumn = $dateColumn ?? $this->dateColumn;
         $this->softDelete = $softDelete ?? $this->softDelete;
+        $this->softDeleteColumn = $softDeleteColumn ?? $this->softDeleteColumn;
         $this->conditions = $conditions ?? $this->conditions;
         $this->primaryId = $primaryId ?? $this->primaryId;
     }
@@ -33,6 +35,7 @@ class ArchiveSettings
             'archive_older_than_days' => Config::get('db_archive.settings.archive_older_than_days', 30),
             'date_column' => Config::get('db_archive.settings.date_column', 'created_at'),
             'soft_delete' => Config::get('db_archive.settings.soft_delete', false),
+            'soft_delete_column' => Config::get('db_archive.settings.soft_delete_column', 'deleted_at'),
             'conditions' => Config::get('db_archive.settings.conditions', []),
             'primary_id' => Config::get('db_archive.settings.primary_id', 'id'),
         ];
@@ -42,6 +45,7 @@ class ArchiveSettings
             batchSize: $settings['batch_size'] ?? null,
             dateColumn: $settings['date_column'] ?? null,
             softDelete: $settings['soft_delete'] ?? null,
+            softDeleteColumn: $settings['soft_delete_column'] ?? null,
             tablePrefix: $settings['table_prefix'] ?? null,
             conditions: $settings['conditions'] ?? null,
             primaryId: $settings['primary_id'] ?? null

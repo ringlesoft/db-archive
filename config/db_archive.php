@@ -14,6 +14,8 @@ return [
         'batch_size' => 1000,
         'archive_older_than_days' => 365,
         'date_column' => 'created_at',
+        'soft_delete' => false,
+        'soft_delete_column' => 'deleted_at',
         'conditions' => [],
         // Must identify rows uniquely in both source and archive tables.
         'primary_id' => 'id',

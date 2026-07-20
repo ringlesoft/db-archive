@@ -8,7 +8,9 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Event;
+use RingleSoft\DbArchive\Events\TableArchived;
+use RingleSoft\DbArchive\Events\TableArchivingFailed;
 use RingleSoft\DbArchive\Utility\Logger;
 use Throwable;
 
@@ -21,6 +23,7 @@ class TableArchiver
     public ?string $archiveConnection;
     public ArchiveSettings $settings;
     public Carbon $cutoffDate;
+    private ?ArchiveResult $lastResult = null;
 
     public function __construct(string $table, ?array $settings = [])
     {
@@ -56,6 +59,11 @@ class TableArchiver
      */
     public function archive(): bool
     {
+        return $this->archiveWithResult()->successful;
+    }
+
+    public function archiveWithResult(): ArchiveResult
+    {
         $this->cutoffDate = Carbon::now()->subDays($this->settings->archiveOlderThanDays);
         Logger::info("Archiving table: " . $this->table);
         $sourceConnection = DB::connection($this->activeConnection);
@@ -66,10 +74,16 @@ class TableArchiver
         $dateColumn = $this->settings->dateColumn;
         $conditions = $this->settings->conditions;
         $primaryId = $this->settings->primaryId ?? 'id';
+        $softDelete = $this->settings->softDelete;
+        $softDeleteColumn = $this->settings->softDeleteColumn;
+        $scanned = 0;
+        $archived = 0;
+        $removed = 0;
 
         try {
             $sourceConnection->table($sourceTableName)
                 ->where($dateColumn, '<', $this->cutoffDate)
+                ->when($softDelete, fn ($query) => $query->whereNull($softDeleteColumn))
                 ->when(count($conditions), function ($query) use ($conditions) {
                     foreach ($conditions as $key => $value) {
                         if (is_numeric($key) && is_array($value) && (count($value) && count($value) <= 3)) {
@@ -80,7 +94,7 @@ class TableArchiver
                     }
                 })
                 ->orderBy($dateColumn)
-                ->chunkById($chunkSize, function ($sourceRecords) use ($sourceTableName, $archiveTableName, $archiveConnection, $sourceConnection, $primaryId) {
+                ->chunkById($chunkSize, function ($sourceRecords) use ($sourceTableName, $archiveTableName, $archiveConnection, $sourceConnection, $primaryId, $softDelete, $softDeleteColumn, &$scanned, &$archived, &$removed) {
                     $dataToArchive = [];
                     $idsToDelete = [];
 
@@ -88,6 +102,8 @@ class TableArchiver
                         $dataToArchive[] = (array)$record;
                         $idsToDelete[] = $record->{$primaryId};
                     }
+
+                    $scanned += count($dataToArchive);
 
                     if (!empty($dataToArchive)) {
                         // Re-running a partially completed archive updates the same rows
@@ -98,24 +114,58 @@ class TableArchiver
                             [$primaryId],
                             $columnsToUpdate,
                         );
+                        $archived += count($dataToArchive);
                     }
 
                     if (!empty($idsToDelete)) {
-                        $sourceConnection->table($sourceTableName)
+                        $sourceQuery = $sourceConnection->table($sourceTableName)
                             ->whereIn($primaryId, $idsToDelete)
-                            ->delete();
+                            ->when($softDelete, fn ($query) => $query->whereNull($softDeleteColumn));
+                        $removed += $softDelete
+                            ? $sourceQuery->update([$softDeleteColumn => Carbon::now()])
+                            : $sourceQuery->delete();
                     }
                 }, $primaryId);
-            return true;
-        } catch (QueryException $e) {
-            Logger::error($e->getMessage());
-            return false;
-        } catch (Exception $e) {
-            Logger::error($e->getMessage());
-            return false;
+
+            return $this->recordResult(new ArchiveResult(
+                $sourceTableName,
+                $archiveTableName,
+                $scanned,
+                $archived,
+                $removed,
+                $softDelete ? $removed : 0,
+                true,
+            ));
         } catch (Throwable $e) {
-            Logger::error($e->getMessage());
-            return false;
+            return $this->recordResult(new ArchiveResult(
+                $sourceTableName,
+                $archiveTableName,
+                $scanned,
+                $archived,
+                $removed,
+                $softDelete ? $removed : 0,
+                false,
+                $e->getMessage(),
+            ));
         }
+    }
+
+    public function lastResult(): ?ArchiveResult
+    {
+        return $this->lastResult;
+    }
+
+    private function recordResult(ArchiveResult $result): ArchiveResult
+    {
+        $this->lastResult = $result;
+        Logger::log($result->successful ? 'info' : 'error', 'Database archive completed.', $result->toArray());
+
+        try {
+            Event::dispatch($result->successful ? new TableArchived($result) : new TableArchivingFailed($result));
+        } catch (Throwable $eventException) {
+            Logger::error('Could not dispatch database archive event.', ['exception' => $eventException]);
+        }
+
+        return $result;
     }
 }

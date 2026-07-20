@@ -30,12 +30,12 @@ class ArchiveTableJob implements ShouldQueue
      */
     public function handle(): void
     {
-        $archived = TableArchiver::of($this->table)
+        $result = TableArchiver::of($this->table)
             ->withSettings($this->settings)
-            ->archive();
+            ->archiveWithResult();
 
-        if (!$archived) {
-            throw new RuntimeException("Failed to archive table '{$this->table}'.");
+        if (!$result->successful) {
+            throw new RuntimeException($result->error ?? "Failed to archive table '{$this->table}'.");
         }
     }
 }
