@@ -15,6 +15,7 @@ return [
         'archive_older_than_days' => 365,
         'date_column' => 'created_at',
         'conditions' => [],
+        // Must identify rows uniquely in both source and archive tables.
         'primary_id' => 'id',
     ],
 

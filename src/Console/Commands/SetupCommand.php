@@ -37,7 +37,7 @@ class SetupCommand extends Command
     {
         $force = (bool)$this->option('force');
 
-        $tablePrefix = Config::get('db_archive.prefix');
+        $tablePrefix = Config::get('db_archive.settings.table_prefix');
         $archiveConnectionName = Config::get('db_archive.connection');
         $activeConnection = DB::connection();
         $archiveConnection = DB::connection($archiveConnectionName);

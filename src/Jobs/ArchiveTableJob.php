@@ -8,6 +8,8 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Foundation\Bus\Dispatchable;
 use RingleSoft\DbArchive\Services\TableArchiver;
+use RuntimeException;
+use Throwable;
 
 class ArchiveTableJob implements ShouldQueue
 {
@@ -23,10 +25,17 @@ class ArchiveTableJob implements ShouldQueue
         $this->settings = $settings;
     }
 
+    /**
+     * @throws Throwable
+     */
     public function handle(): void
     {
-        TableArchiver::of($this->table)
-        ->withSettings($this->settings)
-        ->archive();
+        $archived = TableArchiver::of($this->table)
+            ->withSettings($this->settings)
+            ->archive();
+
+        if (!$archived) {
+            throw new RuntimeException("Failed to archive table '{$this->table}'.");
+        }
     }
 }

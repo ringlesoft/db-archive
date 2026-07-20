@@ -94,6 +94,12 @@ class SetupService
             $createTableStatement = str_replace("`$tableName`", "`$targetTableName`", $createTableStatement);
             if ($driverName === 'pgsql') {
                 $createTableStatement = str_replace((string)$tableName, (string)$targetTableName, $createTableStatement); //For postgresql, table name might not be quoted in CREATE TABLE statement
+            } else if ($driverName === 'sqlite') {
+                $createTableStatement = str_replace(
+                    ['"' . $tableName . '"', "'" . $tableName . "'", 'CREATE TABLE ' . $tableName],
+                    ['"' . $targetTableName . '"', "'" . $targetTableName . "'", 'CREATE TABLE ' . $targetTableName],
+                    $createTableStatement,
+                );
             } else if ($driverName === 'sqlsrv') {
                 // For SQL Server, table names might be quoted with brackets
                 $createTableStatement = str_replace(array("[$tableName]", (string)$tableName), array("[$targetTableName]", (string)$targetTableName), $createTableStatement); // For SQL Server, table names might not be quoted in CREATE TABLE statement
@@ -214,20 +220,21 @@ class SetupService
     public function archiveTableExists(string $tableName): bool
     {
         $archiveConfig = Config::get("database.connections.$this->archiveConnection");
+        $archiveTableName = $this->archiveTableName($tableName);
         try {
             DB::connection($this->activeConnection)->getPdo();
             switch ($archiveConfig['driver']) {
                 case 'mysql':
-                    $query = "SHOW TABLES LIKE '$tableName'";
+                    $query = "SHOW TABLES LIKE '$archiveTableName'";
                     break;
                 case 'pgsql':
-                    $query = "SELECT tablename FROM pg_tables WHERE tablename =  '$tableName'";
+                    $query = "SELECT tablename FROM pg_tables WHERE tablename =  '$archiveTableName'";
                     break;
                 case 'sqlsrv':
-                    $query = "SELECT name FROM sys.tables WHERE name =  '$tableName'";
+                    $query = "SELECT name FROM sys.tables WHERE name =  '$archiveTableName'";
                     break;
                 case 'sqlite':
-                    return true;
+                    return Schema::connection($this->archiveConnection)->hasTable($archiveTableName);
                 default:
                     throw new RuntimeException("Unsupported database driver: {$archiveConfig['driver']}");
             }
@@ -277,12 +284,17 @@ class SetupService
     public function dropArchiveTable(mixed $table): bool
     {
         try {
-            Schema::connection($this->archiveConnection)->dropIfExists($table);
+            Schema::connection($this->archiveConnection)->dropIfExists($this->archiveTableName($table));
         } catch (Exception $e) {
             Logger::debug($e);
             return false;
         }
         return true;
+    }
+
+    private function archiveTableName(string $tableName): string
+    {
+        return $this->tablePrefix ? "{$this->tablePrefix}_{$tableName}" : $tableName;
     }
 
 }

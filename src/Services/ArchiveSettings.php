@@ -33,6 +33,8 @@ class ArchiveSettings
             'archive_older_than_days' => Config::get('db_archive.settings.archive_older_than_days', 30),
             'date_column' => Config::get('db_archive.settings.date_column', 'created_at'),
             'soft_delete' => Config::get('db_archive.settings.soft_delete', false),
+            'conditions' => Config::get('db_archive.settings.conditions', []),
+            'primary_id' => Config::get('db_archive.settings.primary_id', 'id'),
         ];
         $settings = array_merge($defaultSettings, $settings);
         return new self(

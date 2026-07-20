@@ -60,7 +60,7 @@ ARCHIVE_DB_CONNECTION=mysql_archive
 ```
 
 ### Step 4: Configure Your Tables
-In your `config/db-archive.php` file, define the tables you want to archive and their associated settings. For example:
+In your `config/db_archive.php` file, define the tables you want to archive and their associated settings. For example:
 ```php
 'tables' => [
     'orders',
@@ -114,6 +114,10 @@ You can also implement the `ArchivesData` trait in your models to access their a
   - Defaults to an empty array `[]`.
   - Example: `[['status', 'active']]` or `[['id', '<=', 100]]`
 
+- `primary_id`:
+  - The unique identifier used for chunking and safe archive retries.
+  - Defaults to `id`; it must be unique in both source and archive tables.
+
 #### `enable_logging`:
 - Boolean value to enable or disable logging of the archiving process.
 - Logs are stored in the default Laravel log file.
@@ -124,7 +128,8 @@ You can also implement the `ArchivesData` trait in your models to access their a
   - Email address to receive notifications about the archiving process (success or failure).
   - Set to null to disable email notifications.
   - Defaults to `admin@example.com`.
-  - This only works if batching is enabled (for now).
+- This only works if batching is enabled (for now).
+  - A success email is sent after all batch jobs finish; a failure email is sent if a job fails.
   
 #### `tables`:
 - An array defining the tables to be archived.
@@ -189,7 +194,7 @@ Adjust the scheduling as per your requirements (e.g., daily, weekly, monthly).
 
 ### Basic Usage 
 (Archive orders table with default settings)
-> // config/db-archive.php
+> // config/db_archive.php
 
 ```php
 'connection' => 'mysql_archive',
@@ -199,11 +204,11 @@ Adjust the scheduling as per your requirements (e.g., daily, weekly, monthly).
     'comments'
 ],
 ```
-This configuration will archive records from the `users` table in your default connection that are older than 365 days (based on the `created_at` column) to `users` table in the `mysql_archive` connection.
+This configuration will archive records from the `orders` and `comments` tables from your default connection that are older than 365 days (based on the `created_at` column) to `orders` and `comments` tables in the `mysql_archive` connection database.
 
 ### Custom Settings
 
-> // config/db-archive.php
+> // config/db_archive.php
 
 ```php
 'connection' => 'mysql_archive',

@@ -40,6 +40,12 @@ class TableArchiver
     public function withSettings(array $settings): self
     {
         $this->settings = ArchiveSettings::fromArray($settings);
+        if (isset($this->table)) {
+            $this->archiveTable = $this->settings->tablePrefix
+                ? $this->settings->tablePrefix . '_' . $this->table
+                : $this->table;
+        }
+
         return $this;
     }
 
@@ -62,7 +68,6 @@ class TableArchiver
         $primaryId = $this->settings->primaryId ?? 'id';
 
         try {
-            DB::beginTransaction(); // Start a transaction to ensure atomicity
             $sourceConnection->table($sourceTableName)
                 ->where($dateColumn, '<', $this->cutoffDate)
                 ->when(count($conditions), function ($query) use ($conditions) {
@@ -85,7 +90,14 @@ class TableArchiver
                     }
 
                     if (!empty($dataToArchive)) {
-                        $archiveConnection->table($archiveTableName)->insert($dataToArchive);
+                        // Re-running a partially completed archive updates the same rows
+                        // instead of creating duplicates before the source delete retries.
+                        $columnsToUpdate = array_values(array_diff(array_keys($dataToArchive[0]), [$primaryId]));
+                        $archiveConnection->table($archiveTableName)->upsert(
+                            $dataToArchive,
+                            [$primaryId],
+                            $columnsToUpdate,
+                        );
                     }
 
                     if (!empty($idsToDelete)) {
@@ -93,22 +105,17 @@ class TableArchiver
                             ->whereIn($primaryId, $idsToDelete)
                             ->delete();
                     }
-                });
-            DB::commit();
+                }, $primaryId);
             return true;
         } catch (QueryException $e) {
-            DB::rollBack(); // Rollback the transaction in case of any error
             Logger::error($e->getMessage());
-            return false; // Or throw an exception if you want to handle it differently up the call stack
+            return false;
         } catch (Exception $e) {
-            DB::rollBack(); // Rollback transaction for other exceptions as well
             Logger::error($e->getMessage());
-            return false; // Or throw exception
+            return false;
         } catch (Throwable $e) {
-            DB::rollBack(); // Rollback transaction for other exceptions as well
             Logger::error($e->getMessage());
-            return false; // Or throw exception
+            return false;
         }
     }
 }
-
