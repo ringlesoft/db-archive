@@ -67,7 +67,7 @@ class Logger extends Log
     public static function log(mixed $level, string|Stringable $message, array $context = []): void
     {
         if(self::loggingEnabled()){
-            parent::log($message, $context);
+            parent::log($level, $message, $context);
         }
     }
 
